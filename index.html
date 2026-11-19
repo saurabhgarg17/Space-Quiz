@@ -72,6 +72,7 @@
   .fact { min-height: 44px; margin: 14px 0 0; font-size: 14px; color: var(--muted); }
   .next { margin-top: 8px; }
   .score { font-size: 48px; font-weight: 800; margin: 4px 0; color: var(--saffron); }
+  .share-status { min-height: 24px; margin: 12px 0 0; font-size: 14px; }
   .emoji { font-size: 72px; animation: bounce 1s ease; }
   @keyframes bounce { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
   .hidden { display: none; }
@@ -104,6 +105,8 @@
     <h1 id="title"></h1>
     <p id="msg"></p>
     <button class="primary" id="again">Play again</button>
+    <button class="primary" id="share">Share result</button>
+    <p class="share-status" id="shareStatus" role="status" aria-live="polite"></p>
   </section>
 </main>
 
@@ -207,6 +210,27 @@ function finish() {
   $("again").focus();
 }
 
+async function shareResult() {
+  const text = `I scored ${score} / ${QUESTIONS.length} on the Space Exploration Quiz! Can you beat my score?`;
+  $("shareStatus").textContent = "";
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "Space Exploration Quiz", text });
+      $("shareStatus").textContent = "Result shared.";
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
+    await navigator.clipboard.writeText(text);
+    $("shareStatus").textContent = "Result copied to clipboard.";
+  } catch {
+    $("shareStatus").textContent = `Unable to copy automatically. Share this text manually: ${text}`;
+  }
+}
+
 document.addEventListener("keydown", e => {
   if ($("quiz").classList.contains("hidden")) return;
   const btns = [...$("opts").children];
@@ -224,6 +248,7 @@ $("fact").setAttribute("aria-live", "polite");
 $("go").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
 $("next").onclick = () => { ++i < QUESTIONS.length ? render() : finish(); };
 $("again").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
+$("share").onclick = shareResult;
 </script>
 </body>
 </html>
