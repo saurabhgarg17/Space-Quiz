@@ -86,6 +86,7 @@
     <div class="hero">🚀</div>
     <h1>Space Exploration Quiz</h1>
     <p>Ten questions on rockets, rovers and the final frontier. Ready for liftoff?</p>
+    <p id="bestStart"></p>
     <button class="primary" id="go">Start mission</button>
   </section>
 
@@ -103,6 +104,7 @@
     <div class="score" id="final"></div>
     <h1 id="title"></h1>
     <p id="msg"></p>
+    <p id="bestFinal"></p>
     <button class="primary" id="again">Play again</button>
   </section>
 </main>
@@ -122,7 +124,18 @@ const QUESTIONS = [
 ];
 
 const $ = id => document.getElementById(id);
+const PERSONAL_BEST_KEY = "spaceQuizPersonalBest";
 let i = 0, score = 0, locked = false;
+
+function personalBest() {
+  const best = Number(localStorage.getItem(PERSONAL_BEST_KEY));
+  return Number.isInteger(best) && best >= 0 && best <= QUESTIONS.length ? best : 0;
+}
+
+function showPersonalBest(best = personalBest()) {
+  $("bestStart").textContent = `Personal best: ${best} / ${QUESTIONS.length}`;
+  $("bestFinal").textContent = `Personal best: ${best} / ${QUESTIONS.length}`;
+}
 
 function show(id) {
   ["start", "quiz", "result"].forEach(s => $(s).classList.toggle("hidden", s !== id));
@@ -191,6 +204,12 @@ function confetti() {
 
 function finish() {
   show("result");
+  let best = personalBest();
+  if (score > best) {
+    best = score;
+    localStorage.setItem(PERSONAL_BEST_KEY, String(best));
+  }
+  showPersonalBest(best);
   const tiers = [
     [10, "🏆", "Mission Commander!", "A perfect flight. Mission control is cheering."],
     [8, "🚀", "Astronaut material", "Strong orbit. Just a few small course corrections."],
@@ -220,6 +239,7 @@ document.addEventListener("keydown", e => {
   }
 });
 $("fact").setAttribute("aria-live", "polite");
+showPersonalBest();
 
 $("go").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
 $("next").onclick = () => { ++i < QUESTIONS.length ? render() : finish(); };
