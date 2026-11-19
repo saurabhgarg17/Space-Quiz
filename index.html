@@ -53,6 +53,13 @@
     border-radius: 99px; transition: width .5s cubic-bezier(.4,1.4,.5,1);
   }
   .opts { display: grid; gap: 10px; text-align: left; }
+  .lifeline-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+  .lifeline {
+    background: var(--pepper-3); border: 1px solid var(--saffron); color: var(--cream);
+    padding: 8px 14px; border-radius: 999px;
+  }
+  .lifeline:disabled { cursor: default; opacity: .6; }
+  .lifeline-status { color: var(--muted); font-size: 13px; }
   .opt {
     background: var(--pepper-3); padding: 12px 16px; border-radius: 12px;
     border: 2px solid transparent; transition: transform .15s, background .2s, border-color .2s;
@@ -128,6 +135,10 @@
     <div class="bar"><i id="fill"></i></div>
     <h2 id="q"></h2>
     <div class="opts" id="opts"></div>
+    <div class="lifeline-row">
+      <button id="lifeline" class="lifeline" type="button">50/50 Lifeline</button>
+      <span id="lifelineStatus" class="lifeline-status" role="status" aria-live="polite"></span>
+    </div>
     <div class="fact" id="fact"></div>
     <button class="primary next hidden" id="next">Next</button>
   </section>
@@ -169,6 +180,7 @@ const $ = id => document.getElementById(id);
 const PERSONAL_BEST_KEY = "spaceQuizPersonalBest";
 let i = 0, score = 0, locked = false, runQuestions = [], runSignature = "";
 let missedAnswers = [];
+let lifelineUsed = false, visibleOptionIndices = [];
 
 function shuffle(items) {
   const shuffled = [...items];
@@ -225,15 +237,37 @@ function render() {
   $("q").textContent = q;
   $("fact").textContent = "";
   $("next").classList.add("hidden");
+  visibleOptionIndices = opts.map((_, idx) => idx);
+  $("lifeline").disabled = lifelineUsed;
+  $("lifeline").textContent = lifelineUsed ? "50/50 Used" : "50/50 Lifeline";
+  renderOptions();
+}
+
+function renderOptions() {
+  const opts = runQuestions[i][1];
   $("opts").innerHTML = "";
-  opts.forEach((text, idx) => {
+  visibleOptionIndices.forEach(idx => {
     const b = document.createElement("button");
     b.className = "opt";
-    b.textContent = text;
+    b.textContent = opts[idx];
+    b.dataset.optionIndex = String(idx);
     b.onclick = () => answer(idx);
     $("opts").appendChild(b);
   });
   $("opts").firstChild.focus();
+}
+
+function useLifeline() {
+  if (locked || lifelineUsed) return;
+  const correct = runQuestions[i][2];
+  const incorrect = visibleOptionIndices.filter(idx => idx !== correct);
+  const retainedIncorrect = incorrect[Math.floor(Math.random() * incorrect.length)];
+  visibleOptionIndices = [correct, retainedIncorrect].sort((a, b) => a - b);
+  lifelineUsed = true;
+  $("lifeline").disabled = true;
+  $("lifeline").textContent = "50/50 Used";
+  $("lifelineStatus").textContent = "Two incorrect options removed.";
+  renderOptions();
 }
 
 function flash(kind) {
@@ -246,6 +280,7 @@ function flash(kind) {
 function answer(idx) {
   if (locked) return;
   locked = true;
+  $("lifeline").disabled = true;
   const [, , correct, fact] = runQuestions[i];
   if (idx !== correct) {
     missedAnswers.push({
@@ -256,10 +291,11 @@ function answer(idx) {
     });
   }
   const btns = [...$("opts").children];
-  btns.forEach((b, n) => {
+  btns.forEach(b => {
+    const optionIndex = Number(b.dataset.optionIndex);
     b.disabled = true;
-    if (n === correct) b.classList.add("correct");
-    else if (n === idx) b.classList.add("wrong");
+    if (optionIndex === correct) b.classList.add("correct");
+    else if (optionIndex === idx) b.classList.add("wrong");
     else b.classList.add("dim");
   });
   if (idx === correct) { score++; flash("good"); } else flash("bad");
@@ -369,7 +405,10 @@ document.addEventListener("keydown", e => {
   if ($("quiz").classList.contains("hidden")) return;
   const btns = [...$("opts").children];
   const n = parseInt(e.key, 10);
-  if (!locked && n >= 1 && n <= btns.length) { answer(n - 1); return; }
+  if (!locked && n >= 1 && n <= btns.length) {
+    answer(Number(btns[n - 1].dataset.optionIndex));
+    return;
+  }
   if (!locked && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
     e.preventDefault();
     const cur = btns.indexOf(document.activeElement);
@@ -380,9 +419,10 @@ document.addEventListener("keydown", e => {
 $("fact").setAttribute("aria-live", "polite");
 showPersonalBest();
 
-$("go").onclick = () => { runQuestions = createRun(); i = 0; score = 0; missedAnswers = []; show("quiz"); render(); };
+$("go").onclick = () => { runQuestions = createRun(); i = 0; score = 0; missedAnswers = []; lifelineUsed = false; $("lifelineStatus").textContent = ""; show("quiz"); render(); };
+$("lifeline").onclick = useLifeline;
 $("next").onclick = () => { ++i < runQuestions.length ? render() : finish(); };
-$("again").onclick = () => { runQuestions = createRun(); i = 0; score = 0; missedAnswers = []; show("quiz"); render(); };
+$("again").onclick = () => { runQuestions = createRun(); i = 0; score = 0; missedAnswers = []; lifelineUsed = false; $("lifelineStatus").textContent = ""; show("quiz"); render(); };
 $("share").onclick = shareResult;
 $("review").onclick = openReview;
 $("reviewDone").onclick = () => { show("result"); $("again").focus(); };
