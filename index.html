@@ -128,7 +128,39 @@ const QUESTIONS = [
 
 const $ = id => document.getElementById(id);
 const PERSONAL_BEST_KEY = "spaceQuizPersonalBest";
-let i = 0, score = 0, locked = false;
+let i = 0, score = 0, locked = false, runQuestions = [], runSignature = "";
+
+function shuffle(items) {
+  const shuffled = [...items];
+  for (let n = shuffled.length - 1; n > 0; n--) {
+    const j = Math.floor(Math.random() * (n + 1));
+    [shuffled[n], shuffled[j]] = [shuffled[j], shuffled[n]];
+  }
+  return shuffled;
+}
+
+function createRun() {
+  let next;
+  let attempts = 0;
+  do {
+    next = shuffle(QUESTIONS).map(([q, opts, correct, fact]) => {
+      const correctText = opts[correct];
+      const shuffledOpts = shuffle(opts);
+      return [q, shuffledOpts, shuffledOpts.indexOf(correctText), fact];
+    });
+    attempts++;
+  } while (runSignature && signatureFor(next) === runSignature && attempts < 10);
+
+  if (runSignature && signatureFor(next) === runSignature) {
+    next.push(next.shift());
+  }
+  runSignature = signatureFor(next);
+  return next;
+}
+
+function signatureFor(questions) {
+  return questions.map(([q, opts]) => `${q}|${opts.join("|")}`).join("||");
+}
 
 function personalBest() {
   const best = Number(localStorage.getItem(PERSONAL_BEST_KEY));
@@ -146,10 +178,10 @@ function show(id) {
 
 function render() {
   locked = false;
-  const [q, opts] = QUESTIONS[i];
-  $("count").textContent = `Question ${i + 1} of ${QUESTIONS.length}`;
+  const [q, opts] = runQuestions[i];
+  $("count").textContent = `Question ${i + 1} of ${runQuestions.length}`;
   $("pts").textContent = `Score ${score}`;
-  $("fill").style.width = `${(i / QUESTIONS.length) * 100}%`;
+  $("fill").style.width = `${(i / runQuestions.length) * 100}%`;
   $("q").textContent = q;
   $("fact").textContent = "";
   $("next").classList.add("hidden");
@@ -174,7 +206,7 @@ function flash(kind) {
 function answer(idx) {
   if (locked) return;
   locked = true;
-  const [, , correct, fact] = QUESTIONS[i];
+  const [, , correct, fact] = runQuestions[i];
   const btns = [...$("opts").children];
   btns.forEach((b, n) => {
     b.disabled = true;
@@ -185,8 +217,8 @@ function answer(idx) {
   if (idx === correct) { score++; flash("good"); } else flash("bad");
   $("pts").textContent = `Score ${score}`;
   $("fact").textContent = (idx === correct ? "✅ Correct! " : "❌ Not quite. ") + fact;
-  $("fill").style.width = `${((i + 1) / QUESTIONS.length) * 100}%`;
-  $("next").textContent = i === QUESTIONS.length - 1 ? "See results" : "Next";
+  $("fill").style.width = `${((i + 1) / runQuestions.length) * 100}%`;
+  $("next").textContent = i === runQuestions.length - 1 ? "See results" : "Next";
   $("next").classList.remove("hidden");
   $("next").focus();
 }
@@ -265,9 +297,9 @@ document.addEventListener("keydown", e => {
 $("fact").setAttribute("aria-live", "polite");
 showPersonalBest();
 
-$("go").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
-$("next").onclick = () => { ++i < QUESTIONS.length ? render() : finish(); };
-$("again").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
+$("go").onclick = () => { runQuestions = createRun(); i = 0; score = 0; show("quiz"); render(); };
+$("next").onclick = () => { ++i < runQuestions.length ? render() : finish(); };
+$("again").onclick = () => { runQuestions = createRun(); i = 0; score = 0; show("quiz"); render(); };
 $("share").onclick = shareResult;
 </script>
 </body>
