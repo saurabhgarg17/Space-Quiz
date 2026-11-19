@@ -78,6 +78,27 @@
   .hidden { display: none; }
   .confetti { position: fixed; top: -12px; width: 8px; height: 14px; animation: fall linear forwards; pointer-events: none; }
   @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .card,
+    .hero,
+    .opt.correct,
+    .opt.wrong,
+    .flash.good,
+    .flash.bad,
+    .emoji,
+    .confetti {
+      animation: none !important;
+    }
+    .primary,
+    .bar > i,
+    .opt {
+      transition: none !important;
+    }
+    .primary:hover,
+    .opt:hover:not(:disabled) {
+      transform: none;
+    }
+  }
 </style>
 </head>
 <body>
@@ -192,6 +213,7 @@ function answer(idx) {
 }
 
 function confetti() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const colors = ["#e0592a", "#f2b134", "#2fbf71", "#f6ece0"];
   for (let n = 0; n < 40; n++) {
     const c = document.createElement("div");
