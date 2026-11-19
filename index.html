@@ -76,6 +76,17 @@
   .emoji { font-size: 72px; animation: bounce 1s ease; }
   @keyframes bounce { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
   .hidden { display: none; }
+  .review-list { display: grid; gap: 12px; text-align: left; margin: 16px 0; }
+  .review-item {
+    background: var(--pepper-3); border-radius: 12px; padding: 14px 16px;
+  }
+  .review-item h2 { margin: 0 0 10px; font-size: 16px; }
+  .review-answer { margin: 4px 0; color: var(--muted); }
+  .review-answer strong { color: var(--cream); }
+  .review-answer.selected { color: #ffa3a6; }
+  .review-answer.correct-answer { color: #8ff0b9; }
+  .review-fact { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  #reviewDone { margin-top: 4px; }
   .confetti { position: fixed; top: -12px; width: 8px; height: 14px; animation: fall linear forwards; pointer-events: none; }
   @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
 </style>
@@ -107,8 +118,15 @@
     <p id="msg"></p>
     <p id="bestFinal"></p>
     <button class="primary" id="again">Play again</button>
+    <button class="primary" id="review">Review missed answers</button>
     <button class="primary" id="share">Share result</button>
     <p class="share-status" id="shareStatus" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="reviewSection" class="hidden">
+    <h1>Missed answers</h1>
+    <div class="review-list" id="reviewList"></div>
+    <button class="primary" id="reviewDone">Back to results</button>
   </section>
 </main>
 
@@ -129,6 +147,7 @@ const QUESTIONS = [
 const $ = id => document.getElementById(id);
 const PERSONAL_BEST_KEY = "spaceQuizPersonalBest";
 let i = 0, score = 0, locked = false;
+let missedAnswers = [];
 
 function personalBest() {
   const best = Number(localStorage.getItem(PERSONAL_BEST_KEY));
@@ -141,7 +160,7 @@ function showPersonalBest(best = personalBest()) {
 }
 
 function show(id) {
-  ["start", "quiz", "result"].forEach(s => $(s).classList.toggle("hidden", s !== id));
+  ["start", "quiz", "result", "reviewSection"].forEach(s => $(s).classList.toggle("hidden", s !== id));
 }
 
 function render() {
@@ -175,6 +194,14 @@ function answer(idx) {
   if (locked) return;
   locked = true;
   const [, , correct, fact] = QUESTIONS[i];
+  if (idx !== correct) {
+    missedAnswers.push({
+      question: QUESTIONS[i][0],
+      selected: QUESTIONS[i][1][idx],
+      correct: QUESTIONS[i][1][correct],
+      fact
+    });
+  }
   const btns = [...$("opts").children];
   btns.forEach((b, n) => {
     b.disabled = true;
@@ -225,8 +252,37 @@ function finish() {
   $("final").textContent = `${score} / ${QUESTIONS.length}`;
   $("title").textContent = title;
   $("msg").textContent = msg;
+  $("review").hidden = missedAnswers.length === 0;
   if (score >= 8) confetti();
   $("again").focus();
+}
+
+function openReview() {
+  $("reviewList").innerHTML = "";
+  missedAnswers.forEach((item, idx) => {
+    const entry = document.createElement("article");
+    entry.className = "review-item";
+
+    const question = document.createElement("h2");
+    question.textContent = `${idx + 1}. ${item.question}`;
+
+    const selected = document.createElement("p");
+    selected.className = "review-answer selected";
+    selected.innerHTML = `<strong>Your answer:</strong> ${item.selected}`;
+
+    const correct = document.createElement("p");
+    correct.className = "review-answer correct-answer";
+    correct.innerHTML = `<strong>Correct answer:</strong> ${item.correct}`;
+
+    const fact = document.createElement("p");
+    fact.className = "review-fact";
+    fact.textContent = item.fact;
+
+    entry.append(question, selected, correct, fact);
+    $("reviewList").appendChild(entry);
+  });
+  show("reviewSection");
+  $("reviewDone").focus();
 }
 
 async function shareResult() {
@@ -251,6 +307,11 @@ async function shareResult() {
 }
 
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("reviewSection").classList.contains("hidden")) {
+    show("result");
+    $("again").focus();
+    return;
+  }
   if ($("quiz").classList.contains("hidden")) return;
   const btns = [...$("opts").children];
   const n = parseInt(e.key, 10);
@@ -265,10 +326,12 @@ document.addEventListener("keydown", e => {
 $("fact").setAttribute("aria-live", "polite");
 showPersonalBest();
 
-$("go").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
+$("go").onclick = () => { i = 0; score = 0; missedAnswers = []; show("quiz"); render(); };
 $("next").onclick = () => { ++i < QUESTIONS.length ? render() : finish(); };
-$("again").onclick = () => { i = 0; score = 0; show("quiz"); render(); };
+$("again").onclick = () => { i = 0; score = 0; missedAnswers = []; show("quiz"); render(); };
 $("share").onclick = shareResult;
+$("review").onclick = openReview;
+$("reviewDone").onclick = () => { show("result"); $("again").focus(); };
 </script>
 </body>
 </html>
